@@ -1,7 +1,92 @@
-# Insert chapter 2 title here
+# Week 2 - Regression analysis
 
 *Describe the work you have done this week and summarize your learning.*
 
-- Describe your work and results clearly. 
-- Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods
-- Assume the reader has no previous knowledge of your data or the more advanced methods you are using  
+This week I studied doing regression analysis with R in the IODS-course. Regression analysis is a method for estimating relationships between variables. In this exercise, we will look at the connection of learning strategies and attitude to the course points of one statistics course
+
+More detailed description of the dataset can be found from  http://www.helsinki.fi/~kvehkala/JYTmooc/JYTOPKYS2-meta.txt
+
+lets read the data from the disk
+```{r}
+learning2014 <- read.table(file= 'data/learning2014.txt', header=T)
+```
+
+Dimensions and structure of the data
+```{r}
+
+dim(learning2014)
+```
+
+There are 166 observations and 7 variables in the data
+
+```{r}
+str(learning2014)
+```
+
+The 7 variables in the dataframe are gender, Age, attitude, deep, stra, surf and Points
+
+Lets check the summary and visualize the data
+
+If not already installed, you should run the command install.packages(c("ggplot2","GGally")) to install required packages for data visualization
+
+The summaries of the variables
+
+```{r}
+summary(learning2014)
+```
+
+
+Access the GGally and ggplot2 libraries
+```{r}
+library(GGally)
+```
+```{r}
+library(ggplot2)
+```
+
+
+draw a scatter plot matrix of the variables in learning2014.
+[-1] excludes the first column (gender)
+```{r}
+pairs(learning2014[-1], col=learning2014$gender)
+```
+
+
+create a more advanced plot matrix with ggpairs()
+```{r}
+p <- ggpairs(learning2014, mapping = aes(col=gender, alpha = 0.3), lower = list(combo = wrap("facethist", bins = 20)))
+```
+
+draw the plot
+
+```{r}
+p
+```
+
+It looks like Points is correlated most heavily with attitude, stra and surf.
+We will use these variables later in our regression model.
+Students tend to be fairly young and there is more females than males, which is not that suprising - these are university students, after all.
+Deep learning has its peak on the higher scores.
+
+Next, we should build a model with the variables described above.
+
+Lets create a regression model with attitude, stra and surf as explanatary variables, Points to be explained and print a summary of it
+```{r}
+r_model <- lm(Points ~ attitude + stra + surf, data = learning2014)
+```
+```{r}
+summary(r_model)
+```
+
+stra and surf did not have statistically significant connection to Points, attitude did. As it is now, the model explains around 0.19 percent of variability of Points is explained by the model according to adjusted R-squared value. 1 point increase in attitude implies a 3.4 point increase in Points if one believes the model. Intercept is around 11, so if explanatory variables are 0, Points should be around 11.
+
+
+As a final touch, lets see graphical analysis of the results by plotting Residuals vs Fitted values, Normal QQ-plot and Residuals vs Leverage
+
+```{r}
+par(mfrow=c(2,2))
+plot(r_model, which= c(1,2,5))
+```
+Residuals vs Fitted seems to be fairly random, so the errors should not depend on explanatory variables
+Q-Q plot seems such that the errors of the model seem fairly normally distributed. There is some deviation in the beginning and the end, but it does not seem dramatic.
+Residuals vs Residuals plot shows some outliers, but their leverage is not drastically high compared to other datapoints.
