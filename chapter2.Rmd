@@ -1,6 +1,6 @@
 # Week 2 - Regression analysis
 
-*Describe the work you have done this week and summarize your learning.*
+
 
 This week I studied doing regression analysis with R in the IODS-course. Regression analysis is a method for estimating relationships between variables. In this exercise, we will look at the connection of learning strategies and attitude to the course points of one statistics course
 
