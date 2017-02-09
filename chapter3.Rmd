@@ -1,0 +1,178 @@
+#Week 3 - Logistic regression
+
+This week, we will explore student alcohol usage. The dataset has, for example, questions related to alcohol usage, social relationships, health and studying. Description of the data can be found here https://archive.ics.uci.edu/ml/datasets/STUDENT+ALCOHOL+CONSUMPTION
+
+
+
+load dplyr, GGally, tidyr and ggplot2
+```{r}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(tidyr)
+```
+
+read the data from data folder
+```{r}
+alc <- read.table(file = 'data/alc.txt', header = T)
+```
+
+glimpse the data
+
+```{r}
+glimpse(alc)
+```
+Data has 382 observations and 35 variables. 
+
+I chose to see if quality of family relationships, family support of education, going out and current health status affect heavy drinking. Rationale behind the choice of first two variables is that may be plausible that social support makes heavy drinking less probable. Going out with friends offers opportunities to drink and there might be social pressure to do so. Overall bad health may lead to drinking. Out of the four variables, family support is binary variables. Family relationships, going out and health are measured on 5 point likert skale.
+
+Now, lets do a subset of data that only has the variables we are interested in and draw bar plots out of them.
+
+```{r}
+alc_sub <- alc[,c("famsup","famrel","goout","health", "high_use")]
+
+# use gather() to gather columns into key-value pairs and then glimpse() at the resulting data
+gather(alc_sub) %>% glimpse
+
+# draw a bar plot of each variable
+gather(alc_sub) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar()
+```
+
+Participants tend to have fairly good family relationships. Most have family support for their studies. Health is skewed towards people feeling very healthy: it is not normally distributed. There is less people in high alcohol usage -category. Going out is fairly normally distributed.
+
+Lets see explore the choices a bit
+
+```{r}
+# initialize a plot of high_use and family relations
+g1 <- ggplot(alc, aes(x = high_use, y = famrel))
+
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("Family relationship")
+
+```
+Good family relationships seem to be connected to not being a high user of alcohol, as hypothesis went
+```{r}
+# initialise a plot of high_use and health
+g2 <- ggplot(alc, aes(x = high_use, y = health))
+
+# define the plot as a boxplot and draw it
+g2 + geom_boxplot() + ylab("Health")
+```
+Maybe a bit suprisingly, health seems to be similar for both high users and low users. This might be due to participants feeling quite healthy overall.
+
+Then, going out and drinking
+
+```{r}
+# initialise a plot of high_use and going out
+g2 <- ggplot(alc, aes(x = high_use, y = goout))
+
+# define the plot as a boxplot and draw it
+g2 + geom_boxplot() + ylab("Going out")
+```
+
+Those goint out with friends more tend to drink more. Not that suprising.
+
+Then, lets see how family support and alcohol usage compare. Let's do a crosstab out of them
+
+```{r}
+#create crosstab from high use and famsup
+
+xtabs(~alc$high_use+alc$famsup)
+```
+
+Overall, people not using a lot of alcohol and having family support are the biggest group. Interestingly, proportianally those not getting family support in high use -group are bigger compared to all in high use than in the not high use group.
+
+
+
+###Building the regression model
+We will use logistic regression as a method of choice. Most often this method is used to predict variables that are binary, such as our high_use is.
+Now we will fit the variables chosen above to regression model and print out a summary of it.
+
+```{r}
+alcm <- glm(high_use ~ famrel + famsup + goout + health, data = alc, family = "binomial")
+summary(alcm)
+```
+
+Okay, so only family relationship and going out has significance. Lets drop everything else and do the model again with only them as a predictor and print the coefficients.
+```{r}
+alcm2 <- glm(high_use ~ famrel + goout, data = alc, family = "binomial")
+summary(alcm2)
+coef(alcm2)
+```
+
+As the family relationship gets poorer, likelyhood to use large amounts of alcohol increases. As person goes out more, the likelihood of being a high user of alcohol increases.
+
+Next, lets see confidence intervals for the coefficients as odds ratio.
+
+```{r}
+OR <- coef(alcm2) %>% exp
+CI <- exp(confint(alcm2))
+
+cbind(OR, CI)
+```
+
+Going out seems to quite heavily increase the tendency for high alcohol consumption. As famrel odds ratio is less than one, it is negatively associated with high alcohol consumption: better family relationships imply a tendency to drink less. Neither of confidence intervals includes 1 which would mean equal odds and thus would indicate unreliability.
+
+How well does the model work in prediction? Maybe the following section can answer to that.
+
+First, confusion matrix.
+
+```{r}
+probabilities <- predict(alcm2, type = "response")
+
+alc <- mutate(alc, probability = probabilities)
+
+alc <- mutate(alc, prediction = probability > 0.5)
+
+table(high_use = alc$high_use, prediction = alc$prediction)
+```
+
+Model looks suprisingly good. Let's plot it.
+```{r}
+logmodg <- ggplot(alc, aes(x = probability, y = high_use, col = prediction))
+logmodg + geom_point()
+```
+Okay, how good the model then actually is? Loss function might tell that to us. First though, lets see a table of prediction results
+
+```{r}
+table(high_use = alc$high_use, prediction = alc$prediction) %>% prop.table() %>% addmargins()
+```
+So the model predicted FALSE when it actually was FALSE 64% of time and TRUE when it was TRUE 12% of time.
+
+```{r}
+
+# the logistic regression model m and dataset alc with predictions are available
+
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = alc$high_use, prob = alc$probability)
+```
+
+So overall, the model is wrong 24% of the guesses. This is actually not that bad.
+
+How would this model compare to one where every prediction would be most common category, that of FALSE? Lets find out by creating a new variable only having FALSE guesses and use the loss function with it.
+
+```{r}
+
+alc$all_false[alc$prediction == TRUE] <- FALSE
+alc$all_false[alc$prediction == FALSE] <- FALSE
+
+loss_func(class = alc$high_use, prob = alc$all_false)
+```
+
+It would seem that the model is better than just guessing FALSE all the time, but one can get pretty good results with that guess also.
+
+###Bonus: Cross validation
+```{r}
+library(boot)
+cv <- cv.glm(data = alc, cost = loss_func, glmfit = alcm2, K = 10)
+cv$delta[1]
+```
+
+Using 10-fold cross validation, it would seem that my model is fairly similar than the datacamp-model, that had misses of around 26%. It might be that going out is just too good of a predictor: going out with friends may mean for student population drinking with friends and such is not the most useful predictor.
