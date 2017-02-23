@@ -1,0 +1,122 @@
+###Week 5: Dimensionality reduction
+
+Load GGally, tidyr, dplyr, corrplot, reshape2 and ggplot2 packages
+```{r}
+library(GGally)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(reshape2)
+```
+
+Load the data to R and inspect it a bit
+```{r}
+human <- read.table(file= 'data/human.txt', header=T, )
+str(human)
+dim(human)
+```
+The data has 155 observations on 8 variables. Each observation in this data represents different country. Edu2.FM and Labo.FM are proportions of females/males with secondary education and how they make up the labour force. Edu.Exp and Life.Exp are expected lenght of education and life expectancy. GNI is short for Gross Domestic Income. Mat.Mor tells maternal mortality ratio, Ado.Birth adolescent birth rate and Parli.F how many percent of the parliament is made out of women.
+
+Graphical overview and summaries of the variables
+```{r}
+
+
+# visualize the 'human' variables
+ggpairs(human)
+
+# compute the correlation matrix and visualize it with corrplot
+cor(human) %>% corrplot()
+
+summary(human)
+
+```
+Life expectancy and years spent in school correlate fairly heavily, also with GNI. Larger proportions of educated females in comparison to males also correlate with these variables. Interestingly, the same is not true for female/male labour ratio. I have worked with similar data before, and there variable that measured females in non-agricultural jobs correlated with GNI. I suspect that females in agricultural jobs are the culprit here.  Both correlate negatively with maternal mortality. GNI, maternal mortality and adolescent birth rate are all negatively skewed on their distributions.
+
+Next, we will do Principal component analysis (PCA) with non scaled data. PCA converts the data to smaller set of variables (principal components) that do not correlate with each other. It is used to bring out patterns in the data.
+
+```{r}
+# perform principal component analysis (with the SVD method)
+pca_human <- prcomp(human)
+#see the summary of the model
+s <- summary(pca_human)
+s
+# draw a biplot of the principal component representation and the original variables
+biplot(pca_human, choices = 1:2, cex = c(0.8, 1) ,col = c("grey40", "deeppink2"))
+
+
+```
+
+Using the unscaled data does not bring out variance explained by the components. The plot shows that this is most likely due to GNI: it has vastly different scale when compared to other variables so the distance that other variables would create to the model does not matter.
+
+
+Do the same with standardized data, then.
+```{r}
+# standardize the variables
+human_std <- scale(human)
+# perform principal component analysis (with the SVD method)
+pca_human <- prcomp(human_std)
+
+# print out summaries of the standardized variables and the model
+summary(human_std)
+s <- summary(pca_human)
+s
+pca_human
+# draw a biplot of the principal component representation and the original variables
+biplot(pca_human, choices = 1:2, cex = c(0.8, 1) ,col = c("grey40", "deeppink2"))
+
+```
+This is much better now. We can see that all the variables are now on the same scale. First dimension still explains most of the variance (around 54 percent), but not all of it. Ratio of females/males of the workforce is heavily loaded to component 2, as is the percentage of females in the parliament. Plot confirms this. However, Parli.F seems to pull slightly towards the countries with high GNI and overall higher life quality meters such as life expectancy, whilst the labour ratio pulls slightly towards qualities such as high maternal mortality.
+
+##TeaTime-data and MCA
+
+Now we will do Multiple Correspondence Analysis, which can be used to detect patterns or structure in the data. It can be also used to reduce data dimensions. We will use data that has answers to questionnaire related to tea consumption.
+
+```{r}
+library(FactoMineR)
+#load the tea data
+data("tea")
+str(tea)
+
+```
+
+I want to simplify the dataset a bit, so I will take 12 first variables of the dataset. This is due to these variables holding when and where -type of data, with one variable indicating if drinking tea is done with friends. It is interesting to see if this sort of spatio-temporal mixture of data with a hint of social factors leads to some revelations
+
+```{r}
+library(reshape2)
+
+tea_sub <- tea[,1:12]
+d <- gather(tea_sub)
+ggplot(d,aes(value)) + 
+    facet_wrap("key",scales = "free") + 
+    geom_bar()
+
+```
+Most people do not enjoy tea during dinner, and tend to drink it home. Drinking tea at brakfast divides data fairly evenly. Lunch is not tea time for many. Tea is often enjoyed with friends, but not in a pub.
+
+Let's create the model.
+```{r}
+#create mca model
+mca <- MCA(tea_sub, graph = FALSE)
+
+# print statistics of the model
+summary(mca)
+
+```
+Dimension 1 and 2 seem to be separated by drinking tea during the dinner time the most according to the variables shown in summary. Drinking tea during dinner time is highly loaded to dim 2 as is not drinking tea at the breakfast. Plotting shows that drinking tea home or not is also important for this dimension. Dimension 1 is more cluttered. Drinking tea in tearooms and with friends is more loaded to this component according to eta2 value. Third dimension seems to be related to drinking tea always.
+
+```{r}
+
+plot(mca, invisible=c("ind"), habillage = "quali")
+```
+
+
+Inspired by Ville Harjunen (https://villehar.github.io/IODS-project/), I wanted to also try and draw plot that he used with his project. I removed arrows from the plot for clarity. Here also individuals are shown. It seems that there are people who prefer drinking tea only on dinners, and seldom at home. Dimension may represent also generally people who seldom drink tea in comparison to those who drink it everywhere, all the time, culminating to people who actually visit specialized tea houses.
+
+```{r}
+library("devtools")
+library("factoextra")
+
+fviz_mca_biplot(mca, axes = c(1, 2), geom = c("point", "text"),
+  label = "all")
+```
