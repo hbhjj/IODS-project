@@ -32,7 +32,7 @@ summary(gend)
 
 #Create the new variables
 
-gender <- mutate(gend, LabRatio = LabF / LabM, EduRatio = EduF / EduM)
+gend <- mutate(gend, LabRatio = LabF / LabM, EduRatio = EduF / EduM)
 
 #Combine the data and check if everything is okay
 human <- inner_join(humdev,gend,by= "Country")
