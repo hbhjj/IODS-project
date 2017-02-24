@@ -1,4 +1,4 @@
-###Week 5: Dimensionality reduction
+#Week 5: Dimensionality reduction
 
 Load GGally, tidyr, dplyr, corrplot, reshape2 and ggplot2 packages
 ```{r}
