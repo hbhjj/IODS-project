@@ -41,6 +41,9 @@ pca_human <- prcomp(human)
 #see the summary of the model
 s <- summary(pca_human)
 s
+```
+
+```{r fig.cap = "Figure 1. A mess due to non-scaled data"}
 # draw a biplot of the principal component representation and the original variables
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1) ,col = c("grey40", "deeppink2"))
 
@@ -62,10 +65,14 @@ summary(human_std)
 s <- summary(pca_human)
 s
 pca_human
+```
+
+```{r fig.cap = "Figure 2. National wellbeing and female participation dimensions"}
 # draw a biplot of the principal component representation and the original variables
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1) ,col = c("grey40", "deeppink2"))
 
 ```
+
 This is much better now. We can see that all the variables are now on the same scale. First dimension still explains most of the variance (around 54 percent), but not all of it. Ratio of females/males of the workforce is heavily loaded to component 2, as is the percentage of females in the parliament. Plot confirms this. However, Parli.F seems to pull slightly towards the countries with high GNI and overall higher life quality meters such as life expectancy, whilst the labour ratio pulls slightly towards qualities such as high maternal mortality.
 
 ##TeaTime-data and MCA
