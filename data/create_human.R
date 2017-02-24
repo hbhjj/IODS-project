@@ -52,7 +52,7 @@ human <- select(human, one_of(selected_variables))
 str(human)
 
 #remove rows with missing values
-human <- x <- human[complete.cases(human), ]
+human <- human[complete.cases(human), ]
 dim(human)
 #lets see, what regions we should remove
 human$Country
