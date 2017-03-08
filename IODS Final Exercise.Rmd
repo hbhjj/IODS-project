@@ -1,0 +1,304 @@
+
+
+#Final exercise - Using logistic regression to predict government/opposition membership from Yle Vaalikone-data
+```{r echo=FALSE, results='hide', message=FALSE}
+#Vaalikonedata data wrangling
+#Read the data from avoindata.fi
+vaalikone <- read.csv2("https://www.avoindata.fi/dataset/2529cd52-35aa-4cd7-8ebf-d5176cf1d913/resource/c0bc8c55-3a2f-4902-b20d-fefab92189b8/download/vastauksetavoimenadatana1.csv")
+
+library(dplyr)
+
+#check structure and dimensions
+str(vaalikone)
+dim(vaalikone)
+
+#rename the variables that I want to use in the model
+
+vaalikone <- rename(vaalikone, too_easy_welfare = X127.Suomessa.on.liian.helppo.el.....sosiaaliturvan.varassa, party = puolue, basic_income = X129.Suomessa.on.siirrytt..v...perustuloon.joka.korvaisi.nykyisen.sosiaaliturvan.v..himm..istason.
+       , shorter_unempl_benefit = X131.Ansiosidonnaisen.ty..tt..myysturvan.kestoa.pit.....lyhent....., gov_spend_cuts = X134.Valtion.ja.kuntien.taloutta.on.tasapainotettava.ensisijaisesti.leikkaamalla.menoja., 
+        cant_afford_current_h_spending = X136.Suomella.ei.ole.varaa.nykyisen.laajuisiin.sosiaali..ja.terveyspalveluihin. )
+#I will attach the vaalikone dataset so that I can write some code in a bit shorter form
+attach(vaalikone)
+
+#lets see how the factors are named in some of the the variables we renamed
+unique(shorter_unempl_benefit)
+unique(basic_income)
+unique(too_easy_welfare)
+unique(cant_afford_current_h_spending)
+unique(gov_spend_cuts)
+unique(party)
+detach(vaalikone)
+#now, lets create a dataset that only has variables of interest and id
+
+variables_of_interest <- c( "id", "party", "shorter_unempl_benefit", "basic_income", "too_easy_welfare", "cant_afford_current_h_spending", "gov_spend_cuts")
+vaalikone <- select(vaalikone, one_of(variables_of_interest))
+
+#lets recode the variables so that not agreeing is small numbers (1-2) and agreeing 3 and 4. Skipping question will be recoded as missing.
+#This way we will get a likert scale of 1-4, 1 being not agreeing at all and 4 agreeing very much
+
+vaalikone$shorter_unempl_benefit <- gsub("t\303\244ysin samaa mielt\303\244", "4", vaalikone$shorter_unempl_benefit)
+vaalikone$shorter_unempl_benefit <- gsub("jokseenkin samaa mielt\303\244", "3", vaalikone$shorter_unempl_benefit)
+vaalikone$shorter_unempl_benefit <- gsub("jokseenkin eri mielt\303\244", "2", vaalikone$shorter_unempl_benefit)
+vaalikone$shorter_unempl_benefit <- gsub("t\303\244ysin eri mielt\303\244", "1", vaalikone$shorter_unempl_benefit)
+vaalikone$shorter_unempl_benefit <- gsub("ohita kysymys", "", vaalikone$shorter_unempl_benefit)
+
+
+vaalikone$basic_income <- gsub("t\303\244ysin samaa mielt\303\244", "4", vaalikone$basic_income)
+vaalikone$basic_income <- gsub("jokseenkin samaa mielt\303\244", "3", vaalikone$basic_income)
+vaalikone$basic_income <- gsub("jokseenkin eri mielt\303\244", "2", vaalikone$basic_income)
+vaalikone$basic_income <- gsub("t\303\244ysin eri mielt\303\244", "1", vaalikone$basic_income)
+vaalikone$basic_income <- gsub("ohita kysymys", "", vaalikone$basic_income)
+
+
+vaalikone$too_easy_welfare <- gsub("t\303\244ysin samaa mielt\303\244", "4", vaalikone$too_easy_welfare)
+vaalikone$too_easy_welfare <- gsub("jokseenkin samaa mielt\303\244", "3", vaalikone$too_easy_welfare)
+vaalikone$too_easy_welfare <- gsub("jokseenkin eri mielt\303\244", "2", vaalikone$too_easy_welfare)
+vaalikone$too_easy_welfare <- gsub("t\303\244ysin eri mielt\303\244", "1", vaalikone$too_easy_welfare)
+vaalikone$too_easy_welfare <- gsub("ohita kysymys", "", vaalikone$too_easy_welfare)
+
+
+
+vaalikone$cant_afford_current_h_spending <- gsub("t\303\244ysin samaa mielt\303\244", "4", vaalikone$cant_afford_current_h_spending)
+vaalikone$cant_afford_current_h_spending <- gsub("jokseenkin samaa mielt\303\244", "3", vaalikone$cant_afford_current_h_spending)
+vaalikone$cant_afford_current_h_spending <- gsub("jokseenkin eri mielt\303\244", "2", vaalikone$cant_afford_current_h_spending)
+vaalikone$cant_afford_current_h_spending <- gsub("t\303\244ysin eri mielt\303\244", "1", vaalikone$cant_afford_current_h_spending)
+vaalikone$cant_afford_current_h_spending <- gsub("ohita kysymys", "", vaalikone$cant_afford_current_h_spending)
+
+vaalikone$gov_spend_cuts <- gsub("t\303\244ysin samaa mielt\303\244", "4", vaalikone$gov_spend_cuts)
+vaalikone$gov_spend_cuts <- gsub("jokseenkin samaa mielt\303\244", "3", vaalikone$gov_spend_cuts)
+vaalikone$gov_spend_cuts <- gsub("jokseenkin eri mielt\303\244", "2", vaalikone$gov_spend_cuts)
+vaalikone$gov_spend_cuts <- gsub("t\303\244ysin eri mielt\303\244", "1", vaalikone$gov_spend_cuts)
+vaalikone$gov_spend_cuts <- gsub("ohita kysymys", "", vaalikone$gov_spend_cuts)
+
+#Create a variable that indicates government or opposition membership in parliament. Parties not in parliament will be empty
+vaalikone$gov_or_op <- factor(rep(NA, length(vaalikone$party) ), 
+                              levels=c("government", "opposition") )   
+vaalikone$gov_or_op[ vaalikone$party %in% c("Perussuomalaiset", "Kansallinen Kokoomus", "Suomen Keskusta")] <- "government"
+vaalikone$gov_or_op[ vaalikone$party %in% c("Suomen ruotsalainen kansanpuolue", "Vihre\303\244 liitto", "Vasemmistoliitto","Suomen Sosialidemokraattinen Puolue","Suomen Kristillisdemokraatit (KD)")] <- "opposition"
+
+#We want to make certain, that only the parties in the parliament are in the data set.
+#Also, we will transform the party variable to character and back to factor. R otherwise reported it still having 42 different levels, even though there is only 8 parties in it
+vaalikone <- subset(vaalikone, vaalikone$party %in% c("Perussuomalaiset", "Kansallinen Kokoomus", "Suomen Keskusta","Suomen ruotsalainen kansanpuolue", "Vihre\303\244 liitto", "Vasemmistoliitto","Suomen Sosialidemokraattinen Puolue","Suomen Kristillisdemokraatit (KD)"))
+vaalikone$party <- as.character(vaalikone$party)
+vaalikone$party <- as.factor(vaalikone$party)
+#turn some variables into numeric and keep only complete cases
+
+vaalikone$shorter_unempl_benefit <- as.numeric(vaalikone$shorter_unempl_benefit)
+vaalikone$basic_income <- as.numeric(vaalikone$basic_income)
+vaalikone$too_easy_welfare <- as.numeric(vaalikone$too_easy_welfare)
+vaalikone$cant_afford_current_h_spending <- as.numeric(vaalikone$cant_afford_current_h_spending)
+vaalikone$gov_spend_cuts <- as.numeric(vaalikone$gov_spend_cuts)
+
+
+vaalikone<- vaalikone[complete.cases(vaalikone), ]
+#check that nothing went wrong
+str(vaalikone)
+dim(vaalikone)
+#ready for the main part
+```
+The data set used in this work are asnwers candidates gave to Yle's vaalikone (Voting assistance application) from the year 2015. It held answers to various political questions of candidates that took part in the national parliament elections of Finland. I have not saved the dataset to my git repo as I am not sure if its license allows it. The data wrangling file is such that it loads the data from avoindata.fi, so code is executable on any computer. The data wrangling part is also run at the beginning f this document, but it is hidden. This is due to the nature of R markdown files. They do not allow using data that is on the general environment of R, but instead require that the file can be run in standalone mode.
+
+The data set I will use contains an identifier variable id and party variable that indicates which party the candidate represents. shorter_unempl_benefit variable where larger number means that individual is more willing to shorten the time that unemployed is able to receive unemployment benefits that are tied to their prior salary level. basic_income variable indicates if candidate would be willing to replace basic social sequrity payments with basic income. too_easy_welfare indicates if candidate thinks that it is too easy in Finland to stay home and live out of welfare benefits. cant_afford_current_h_spending tells if candidate thinks that Finland can not spend as much money to health and social sequrity as it did on 2015. gov_spend_cuts tells if candidate thinks that best way of balancing public sector financial status is to cut government spending. Variable gov_or_op indicates whether the party that candidate has represented is in the government or in the opposition. This was created from the party variable.
+
+In the data wrangling part, I recoded independent variables of the regression analysis from string variables to likert scale as the data had a four point scale as text in it ("do not agree at all" and such instead of numbers). The variables are now measured from 1 (does not agree at all) to 4 (agrees really much). There is no option for neutral answer. Observations with empty or "skip question" choices were removed, so only complete cases were included in the data set. Data has been cleaned of parties that did not make it into the parliament.
+
+
+Load dplyr, GGally, tidyr and ggplot2
+```{r}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(tidyr)
+```
+
+
+glimpse the data
+
+```{r}
+glimpse(vaalikone)
+```
+Data has 1408 observations and 8 variables 
+
+I chose the variables according to a logic that we currently have a government that is leaning towards the right side of the political spectrum, and wished to see if candidate answers predicted some of the decision that this government has done. Current government has cut the lenght of salary based unemployment benefits, stated multiple times that the public sector is spending too much and government spending should be cut. Also, the rhetoric has included that people would get a job faster if it would not be as easy to live on welfare. The attitude towards basic income might not be a clear divider as the idea has been popular across the party lines. However, I decided to include it as it might be seen as a way for citizens to stay at home not working. 
+
+Next, I 
+
+```{r}
+
+
+# use gather() to gather columns into key-value pairs and then glimpse() at the resulting data
+gather(vaalikone) %>% glimpse
+
+# draw a bar plot of each variable but omitting ID and party
+gather(vaalikone[,2:8]) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar()
+
+```
+
+Participants tend to have fairly good family relationships. Most have family support for their studies. Health is skewed towards people feeling very healthy: it is not normally distributed. There is less people in high alcohol usage -category. Going out is fairly normally distributed.
+
+Lets see explore the choices a bit
+
+```{r fig.cap = "Figure 1. Government and opposition membeship against government should cut spending"}
+# initialize a plot of high_use and family relations
+g1 <- ggplot(vaalikone, aes(x = gov_or_op, y = gov_spend_cuts))
+
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("Government should cut")
+
+```
+Good family relationships seem to be connected to not being a high user of alcohol, as hypothesis went
+```{r}
+# initialise a plot of high_use and health
+g2 <- ggplot(vaalikone, aes(x = gov_or_op, y = basic_income))
+
+# define the plot as a boxplot and draw it
+g2 + geom_boxplot() + ylab("Should we introduce basic income to Finland")
+```
+Maybe a bit suprisingly, health seems to be similar for both high users and low users. This might be due to participants feeling quite healthy overall.
+
+Then, going out and drinking
+
+```{r}
+# initialise a plot of high_use and going out
+g3 <- ggplot(vaalikone, aes(x = gov_or_op, y = shorter_unempl_benefit))
+
+# define the plot as a boxplot and draw it
+g3 + geom_boxplot() + ylab("Should unemployment benefits be shorter")
+```
+
+
+```{r}
+# initialise a plot of high_use and going out
+g3 <- ggplot(vaalikone, aes(x = gov_or_op, y = too_easy_welfare))
+
+# define the plot as a boxplot and draw it
+g3 + geom_boxplot() + ylab("Is it too easy to stay on welfare benefits")
+```
+
+```{r}
+# initialise a plot of high_use and going out
+g3 <- ggplot(vaalikone, aes(x = gov_or_op, y = cant_afford_current_h_spending))
+
+# define the plot as a boxplot and draw it
+g3 + geom_boxplot() + ylab("Finland can't spend this much on health and social care")
+```
+
+Those goint out with friends more tend to drink more. Not that suprising.
+
+Then, lets see how family support and alcohol usage compare. Let's do a crosstab out of them
+
+
+
+Overall, people not using a lot of alcohol and having family support are the biggest group. Interestingly, proportianally those not getting family support in high use -group are bigger compared to all in high use than in the not high use group.
+
+
+
+###Building the regression model
+
+
+As I want to predict membership of the government instead of that of opposition, I will turn the government or opposition variable to logical where TRUE equals belonging to a government party. If I run the data as it is now, the model will predict opposition class. 
+
+Also, I will create separate vaalikone_m data for the analysis, which is a copy of vaalikone. This is because there will be variables added to the data along the analysis and I want to have the original data untouched.
+
+```{r}
+vaalikone_m <- vaalikone
+vaalikone_m$gov_or_op_recoded <- vaalikone_m$gov_or_op
+vaalikone_m$gov_or_op_recoded <- gsub("opposition", "FALSE", vaalikone_m$gov_or_op_recoded)
+vaalikone_m$gov_or_op_recoded  <- gsub("government", "TRUE",  vaalikone_m$gov_or_op_recoded)
+
+vaalikone_m$gov_or_op_recoded <- as.logical(vaalikone_m$gov_or_op_recoded)
+```
+
+We will use logistic regression as a method of choice. Most often this method is used to predict variables that are binary, such as our high_use is.
+Now we will fit the variables chosen above to regression model and print out a summary of it.
+
+```{r}
+vaam <- glm(gov_or_op_recoded ~ gov_spend_cuts + basic_income + shorter_unempl_benefit +too_easy_welfare + cant_afford_current_h_spending, data = vaalikone_m, family = "binomial")
+summary(vaam)
+```
+
+Okay, so only family relationship and going out has significance. Lets drop everything else and do the model again with only them as a predictor and print the coefficients.
+```{r}
+vaam2 <- glm(gov_or_op_recoded ~ gov_spend_cuts + shorter_unempl_benefit +too_easy_welfare, data = vaalikone_m, family = "binomial")
+summary(vaam2)
+```
+
+As the family relationship gets poorer, likelyhood to use large amounts of alcohol increases. As person goes out more, the likelihood of being a high user of alcohol increases.
+
+Next, lets see confidence intervals for the coefficients as odds ratio.
+
+```{r}
+OR <- coef(vaam2) %>% exp
+CI <- exp(confint(vaam2))
+
+cbind(OR, CI)
+```
+
+Going out seems to quite heavily increase the tendency for high alcohol consumption. As famrel odds ratio is less than one, it is negatively associated with high alcohol consumption: better family relationships imply a tendency to drink less. Neither of confidence intervals includes 1 which would mean equal odds and thus would indicate unreliability.
+
+How well does the model work in prediction? Maybe the following section can answer to that.
+
+First, confusion matrix.
+
+```{r}
+
+
+probabilities <- predict(vaam2, type = "response")
+
+vaalikone_m <- mutate(vaalikone_m, probability = probabilities)
+
+vaalikone_m <- mutate(vaalikone_m, prediction = probability > 0.5)
+
+table(gov_or_op = vaalikone_m$gov_or_op, prediction = vaalikone_m$prediction)
+```
+
+Model looks suprisingly good. Let's plot it.
+```{r}
+logmodg <- ggplot(vaalikone_m, aes(x = probability, y = gov_or_op, col = prediction))
+logmodg + geom_point()
+```
+Okay, how good the model then actually is? Loss function might tell that to us. First though, lets see a table of prediction results
+
+```{r}
+table(gov_or_op = vaalikone_m$gov_or_op, prediction = vaalikone_m$prediction) %>% prop.table() %>% addmargins()
+```
+So the model predicted FALSE when it actually was FALSE 64% of time and TRUE when it was TRUE 12% of time.
+
+```{r}
+
+# the logistic regression model m and dataset alc with predictions are available
+
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = vaalikone_m$gov_or_op_recoded, prob = vaalikone_m$probability)
+```
+
+So overall, the model is wrong 24% of the guesses. This is actually not that bad.
+
+How would this model compare to one where every prediction would be most common category, that of TRUE, which in this case indicates opposition candidate? Lets find out by creating a new variable only having TRUE guesses and use the loss function with it.
+
+```{r}
+
+vaalikone_m$all_f[vaalikone_m$gov_or_op_recoded == TRUE] <- FALSE
+vaalikone_m$all_f[vaalikone_m$gov_or_op_recoded == FALSE] <- FALSE
+
+loss_func(class = vaalikone_m$gov_or_op_recoded, prob = vaalikone_m$all_f)
+```
+
+It would seem that the model is better than just guessing FALSE all the time, but one can get pretty good results with that guess also.
+
+###Bonus: Cross validation
+```{r}
+library(boot)
+cv <- cv.glm(data = vaalikone_m, cost = loss_func, glmfit = vaam2, K = 10)
+cv$delta[1]
+```
+
+Using 10-fold cross validation, it would seem that my model is fairly similar than the datacamp-model, that had misses of around 26%. It might be that going out is just too good of a predictor: going out with friends may mean for student population drinking with friends and such is not the most useful predictor.
